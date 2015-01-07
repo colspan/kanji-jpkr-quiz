@@ -1,0 +1,230 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Kanji/Hanja Pronunciations</title>
+  <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+  <style>
+  body{
+    position:relative;
+    padding-bottom:120px;
+    min-height: 100%;
+  }
+  .footer {
+    position: absolute;
+    bottom: 0;
+    padding:10px;
+    width: 100%;
+    height: 100px;
+    background-color: #f5f5f5;
+    border-style:solid;
+    border-width:1px 0 0 0;
+    border-color:#c0c0c0;
+  }
+
+  #question{
+    font-size:96pt;
+    text-align:center;
+  }
+  #quiz_candidates{
+    font-size:24pt;
+    cursor:pointer;
+  }
+
+  </style>
+  <script src="http://code.jquery.com/jquery.js"></script>
+  <script src="lib/bootstrap.min.js" charset="utf-8"></script>
+  <script src="lib/d3.v3.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <div id="fb-root"></div>
+  <script>
+  (function(d, s, id) {
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) return;
+    js = d.createElement(s); js.id = id;
+    js.src = "//connect.facebook.net/ja_JP/sdk.js#xfbml=1&appId=123030901113452&version=v2.0";
+    fjs.parentNode.insertBefore(js, fjs);
+  }(document, 'script', 'facebook-jssdk'));
+  </script>
+  <div class="container">
+
+    <div class="row">
+
+      <div class="col-md-6">
+        <h1>Kanji/Hanja Quiz <small>Choose hangul word</small></h1>
+      </div>
+
+      <div class="col-md-6">
+        <div style="height:30px"></div>
+        <span class="fb-like" data-href="http://colspan.github.io/kanji-jpkr-quiz/" data-layout="button_count" data-action="like" data-show-faces="true" data-share="true"></span></span>
+        <span style="position:relative;top:5px;"><a href="https://twitter.com/share" class="twitter-share-button" data-url="http://colspan.github.io/kanji-jpkr-quiz/" data-via="colspan" data-hashtags="kanji-hanja-colspan">Tweet</a></span>
+        <script>
+        !function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');
+        </script>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="well well-lg">
+          <div id="question"></div>
+        </div>
+        <span class="badge"><span id="counter_correct">0</span> / <span id="counter">0</span></span>
+      </div>
+      <div class="col-md-6">
+        <div class="list-group" id="quiz_candidates">
+        </div>
+      </div>
+    </div>
+
+
+<script>
+
+(function (){ // main
+  var word_dic, kanji_dic;
+
+  function arrayMulti(a,b){
+    var ret = [];
+    var i,j;
+    for(i=0;i<a.length;i++){
+      for(j=0;j<b.length;j++){
+        ret.push(a[i]+""+b[j]);
+      }
+    }
+    return ret;
+  }
+
+  function showErrorMessage(error){
+    console.log(error);
+  }
+  var Quiz = {
+    ready:false,
+    state:"wait",
+    currentQuiz:null,
+    counter:0,
+    counter_correct:0
+  };
+  Quiz.setReady = function(){
+    this.ready = true;
+    this.setQuiz();
+  };
+  Quiz.setQuiz = function(){
+    var _this = this;
+    do {
+      this.currentQuiz = this.generateQuizJp(5);
+    } while(this.currentQuiz.candidates.length!=5);
+    this.state = "waiting_answer";
+    this.counter++;
+
+    //表示
+    $("#counter").text(this.counter);
+
+    // 問題
+    var question_span = $("#question");
+    question_span.text(this.currentQuiz.word)
+    // 選択肢
+    var candidate_uls = d3.select("#quiz_candidates");
+    var candidate_lis = candidate_uls.selectAll('a').data(this.currentQuiz.candidates);
+    candidate_lis.enter().append('a');
+    candidate_lis.exit().remove();
+    candidate_lis.text(function(d){return d;}).classed('list-group-item',true).classed('disabled',false).classed('active',false);
+    candidate_lis.on("click",function(d){
+      if(_this.currentQuiz.answer==d){//正解
+        if(_this.state=="waiting_answer"){
+          _this.counter_correct++;
+          $("#counter_correct").text(_this.counter_correct);
+        }
+        _this.state="correct";
+        $("#quiz_candidates a").attr('class',"list-group-item disabled").attr('onclick',null);
+        $(this).attr('class',"list-group-item active");
+        $(this).attr('onclick',null);
+        setTimeout(function(){_this.setQuiz();},1000);
+      }
+      else{//不正解
+        _this.state="incorrect";
+        $(this).attr('class',"list-group-item disabled");
+        $(this).attr('onclick',null);
+      }
+    });
+  }
+  Quiz.generateQuizJp = function(candidate_num){
+    var selected_word = word_dic[Math.floor(Math.random()*word_dic.length)];
+
+    var kanas = selected_word["kana_parsed"].split("|");
+    var kanjis = selected_word["word_kanji"].split("");
+
+    // 日本語読みが同じ漢字検索
+    var i;
+    var incorrect_kanjis = [];
+    for(i=0;i<kanjis.length;i++){
+      var incorrect_kanji = kanji_dic.filter(function(d){
+        var ret = false;
+        if(d["kana"] == kanas[i] && d["kanji"]!=kanjis[i]) ret = true;
+        return ret;
+      });
+      incorrect_kanjis.push(incorrect_kanji.map(function(d){return d["hangul"];}));
+    }
+    // ハングル間違い候補作成
+    var incorrect_candidates = incorrect_kanjis[0];
+    for(i=1;i<kanjis.length;i++){
+      incorrect_candidates = arrayMulti(incorrect_candidates,incorrect_kanjis[i]);
+    }
+    var incorrect_set = d3.set(incorrect_candidates);
+    incorrect_set.remove(selected_word["hangul"]);
+    var incorrect_candidates = incorrect_set.values();
+    var quiz_candidates = incorrect_candidates.slice(0,candidate_num-1);
+    quiz_candidates.push(selected_word.hangul);
+    d3.shuffle(quiz_candidates);
+    return {
+      word:selected_word.word_kanji,
+      candidates:quiz_candidates,
+      answer:selected_word.hangul
+    };
+  }
+
+  // データ読みだし
+  d3.csv("csv/word_jp_kr_dic.csv", function(error, csv) {
+    if(error){
+      showErrorMessage(error);
+      return;
+    }
+    word_dic = csv;
+    d3.csv("csv/kanji_jp_kr_kanji_pronunciation_dic.csv", function(error, csv) {
+      if(error){
+        showErrorMessage(error);
+        return;
+      }
+      kanji_dic = csv;
+      Quiz.setReady();
+    });
+  });
+
+
+
+
+})(); //main end
+
+</script>
+
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <p>Author : <a href="http://twitter.com/colspan">@colspan</a> [<a href="http://github.com/colspan">github</a>]</p>
+    <p>This software and the analyzed corpus data are released under the <a href="LICENSE.txt">MIT License</a>.<br />
+       Data visualization is implemented based on <a href="http://jquery.com/">jQuery</a>, <a href="http://d3js.org/">d3.js</a>, and <a href="https://github.com/jasondavies/d3-parsets">d3.parsets.js</a>.</p>
+  </div>
+</footer>
+
+<!--script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-57298169-1', 'auto');
+ga('send', 'pageview');
+</script-->
+</body>
+</html>

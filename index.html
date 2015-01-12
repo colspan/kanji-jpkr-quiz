@@ -31,7 +31,21 @@
     font-size:24pt;
     cursor:pointer;
   }
-
+  #kanji_list table{
+    width: 100%;
+    table-layout: fixed;
+    cursor:pointer;
+  }
+  #kanji_list table th{
+    vertical-align:middle;
+  }
+  #kanji_list table tr:hover td{
+    background:#ddddff;
+  }
+  #kanji_list_scroller {
+    overflow: scroll;
+    height: 200px;
+  }
   </style>
   <script src="http://code.jquery.com/jquery.js"></script>
   <script src="lib/bootstrap.min.js" charset="utf-8"></script>
@@ -79,6 +93,25 @@
       </div>
     </div>
 
+    <div class="row">
+      <div class="col-md-6" id="kanji_list">
+        <div id="kanji_list_scroller">
+          <table class="table table-condensed table-bordered table-striped table-hover">
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Status</th>
+                <th>Quiz</th>
+                <th>Correct</th>
+                <th>Your Answer</th>
+              </tr>
+            </thead>
+            <tbody id="kanji_tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
 <script>
 
@@ -99,12 +132,14 @@
   function showErrorMessage(error){
     console.log(error);
   }
+
   var Quiz = {
     ready:false,
     state:"wait",
     currentQuiz:null,
     counter:0,
-    counter_correct:0
+    counter_correct:0,
+    first_answer:null
   };
   Quiz.setReady = function(){
     this.ready = true;
@@ -116,6 +151,7 @@
       this.currentQuiz = this.generateQuizJp(5);
     } while(this.currentQuiz.candidates.length!=5);
     this.state = "waiting_answer";
+    this.first_answer = null;
     this.counter++;
 
     //表示
@@ -131,12 +167,17 @@
     candidate_lis.exit().remove();
     candidate_lis.text(function(d){return d;}).classed('list-group-item',true).classed('disabled',false).classed('active',false);
     candidate_lis.on("click",function(d){
+      if(_this.first_answer == null){
+        _this.first_answer = d;
+      }
       if(_this.currentQuiz.answer==d){//正解
+        var correct = false;
         if(_this.state=="waiting_answer"){
+          _this.state="correct";
           _this.counter_correct++;
           $("#counter_correct").text(_this.counter_correct);
         }
-        _this.state="correct";
+        _this.updateQuizList();
         $("#quiz_candidates a").attr('class',"list-group-item disabled").attr('onclick',null);
         $(this).attr('class',"list-group-item active");
         $(this).attr('onclick',null);
@@ -183,6 +224,12 @@
       answer:selected_word.hangul
     };
   }
+  Quiz.updateQuizList = function(){
+    // 漢字リスト作成
+    $('#kanji_tbody').append("<tr><td>" + this.counter + "</td><td>" + (this.state=="correct"?"○":"×") +"</td><td>" + this.currentQuiz.word + "</td><td>" + this.currentQuiz.answer + "</td><td>" + this.first_answer + "</td></tr>");
+    $("#kanji_list_scroller").scrollTop(0);
+  }
+
 
   // データ読みだし
   d3.csv("csv/word_jp_kr_dic.csv", function(error, csv) {
